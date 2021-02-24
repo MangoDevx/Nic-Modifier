@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.Linq;
 using System.Management;
 using System.Net;
@@ -9,7 +8,6 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Principal;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace SetupNetAdapter
 {
@@ -41,7 +39,7 @@ namespace SetupNetAdapter
                 networkAdapters.Add(i, nic);
             }
 
-            Console.WriteLine("Please select the adapter you wish to modify by typing the corresponding number.");
+            Console.WriteLine("Please select the adapter you wish to modify/revert by typing the corresponding number.");
             foreach (var (key, value) in networkAdapters)
             {
                 Console.WriteLine($"{key}: {value.Name}");
@@ -103,10 +101,11 @@ namespace SetupNetAdapter
 
         private void GetNewValues(NetworkInterface nic, IPAddress defaultIpv4, IPAddress defaultGatewayAddress)
         {
-            Console.WriteLine("Ipv4 editing, you have 3 options.\n" +
+            Console.WriteLine("Ipv4 editing, you have 4 options.\n" +
                               "1) Leave blank and hit enter for default\n" +
                               "2) Type \"n\" to use the next available address\n" +
-                              "3) Type a new local ipv4 manually");
+                              "3) Type a new local ipv4 manually\n" +
+                              "4) Type \"r\" to revert any changes previously made");
             IPAddress localIp;
             while (true)
             {
@@ -119,6 +118,16 @@ namespace SetupNetAdapter
                 {
                     localIp = defaultIpv4;
                     break;
+                }
+
+                if (input.Contains("r"))
+                {
+                    var startInfo = new ProcessStartInfo($"netsh interface ip set address \"{nic.Name}\" dhcp");
+                    var process = new Process { StartInfo = startInfo };
+                    process.Start();
+                    Console.WriteLine("Changes reverted. Exiting in 3 seconds.");
+                    Thread.Sleep(3000);
+                    Environment.Exit(-1);
                 }
 
                 if (input.Contains("n"))
@@ -295,11 +304,6 @@ namespace SetupNetAdapter
             }
             catch (Exception e)
             {
-                if (e.Message.Contains("(2)"))
-                {
-                    Console.WriteLine("You need to enable automatic ip. Check the guide for this issue.");
-                    return;
-                }
                 Console.WriteLine($"ipv4 {e.Message}\n{e.StackTrace}");
             }
 
@@ -328,11 +332,6 @@ namespace SetupNetAdapter
             }
             catch (Exception e)
             {
-                if (e.Message.Contains("(2)"))
-                {
-                    Console.WriteLine("You need to enable automatic ip. Check the guide for this issue.");
-                    return;
-                }
                 Console.WriteLine($"dns {e.Message}\n{e.StackTrace}");
                 Console.ReadKey();
             }
@@ -343,15 +342,13 @@ namespace SetupNetAdapter
             try
             {
                 var searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_NetworkAdapterConfiguration");
-                foreach (ManagementObject objMo in searcher.Get())
+                var searcherGet = searcher.Get();
+                foreach (ManagementObject objMo in searcherGet)
                 {
                     var ipEnabled = bool.Parse(objMo["IPEnabled"].ToString() ?? throw new InvalidOperationException());
                     if (!ipEnabled) continue;
-                    Console.WriteLine($"objMo Caption: {objMo["Caption"].ToString().ToLowerInvariant()}");
-                    Console.WriteLine($"Nic description: {nic.Description.ToLowerInvariant()}");
-                    if (!objMo["Caption"].ToString().ToLowerInvariant().Contains(nic.Description.ToLowerInvariant())) continue;
+                    if (!objMo["SettingID"].ToString().Contains(nic.Id)) continue;
                     var dnsServerSearchOrder = (String[])objMo["DNSServerSearchOrder"];
-                    Console.WriteLine($"dnsServerSearchOrder found. {dnsServerSearchOrder[0] ?? "N/A"}, {dnsServerSearchOrder[1] ?? "N/A"}");
                     dnsServerSearchOrder = dns.Split(',');
                     var newDns = objMo.GetMethodParameters("SetDNSServerSearchOrder");
                     newDns["DNSServerSearchOrder"] = dnsServerSearchOrder;
@@ -365,5 +362,6 @@ namespace SetupNetAdapter
             }
             return 0;
         }
+
     }
 }

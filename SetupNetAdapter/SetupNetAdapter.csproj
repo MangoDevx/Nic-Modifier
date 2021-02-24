@@ -8,10 +8,11 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishTrimmed>true</PublishTrimmed>
     <PublishReadyToRun>true</PublishReadyToRun>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Management" Version="5.0.0" />
+    <PackageReference Include="System.Management" Version="4.7.0" />
     <PackageReference Include="System.Security.Principal.Windows" Version="5.0.0" />
   </ItemGroup>
 
