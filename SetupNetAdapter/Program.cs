@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Management;
 using System.Net;
@@ -31,7 +32,7 @@ namespace SetupNetAdapter
             Thread.Sleep(1000);
             var networkAdapters = new Dictionary<int, NetworkInterface>();
             var nics = NetworkInterface.GetAllNetworkInterfaces();
-            var ignoredNics = new[] { "loopback", "bluetooth", "vpn", "nord", "hamachi" };
+            var ignoredNics = new[] { "loopback", "bluetooth", "vpn", "nord", "hamachi", "local", "psuedo" };
             for (var i = 0; i < nics.Length; i++)
             {
                 var nic = nics[i];
@@ -248,7 +249,19 @@ namespace SetupNetAdapter
                 var process = new Process { StartInfo = startInfo };
                 process.Start();
                 Console.WriteLine("netsh updated IPv4, and gateway");
+            }
+            catch (Exception e)
+            {
+                if (e.Message.Contains("(2)"))
+                {
+                    Console.WriteLine("You need to enable automatic ip. Check the guide for this issue.");
+                    return;
+                }
+                Console.WriteLine($"ipv4 {e.Message}\n{e.StackTrace}");
+            }
 
+            try
+            {
                 Console.WriteLine("Starting DNS update");
                 var result = SetDNS($"{dnsOne},{dnsTwo}", nic);
 
@@ -272,7 +285,12 @@ namespace SetupNetAdapter
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.Message + "\n" + e.StackTrace);
+                if (e.Message.Contains("(2)"))
+                {
+                    Console.WriteLine("You need to enable automatic ip. Check the guide for this issue.");
+                    return;
+                }
+                Console.WriteLine($"dns {e.Message}\n{e.StackTrace}");
                 Console.ReadKey();
             }
         }
@@ -282,15 +300,16 @@ namespace SetupNetAdapter
             var objMC = new ManagementClass("Win32_NetworkAdapterConfiguration");
             var objMOC = objMC.GetInstances();
 
-            foreach (ManagementObject objMO in objMOC)
+            foreach (ManagementObject objMo in objMOC)
             {
-                if (!(bool)objMO["IPEnabled"]) continue;
-                if (!objMO["Caption"].ToString().Contains(nic.Description)) continue;
-                var newDNS =
-                    objMO.GetMethodParameters("SetDNSServerSearchOrder");
+                if (!(bool)objMo["IPEnabled"]) continue;
+                //Console.WriteLine(objMo["Caption"].ToString().ToLowerInvariant());
+                //Console.WriteLine(nic.Description.ToLowerInvariant());
+                if (!objMo["Caption"].ToString().ToLowerInvariant().Contains(nic.Description.ToLowerInvariant())) continue;
+                
+                var newDNS = objMo.GetMethodParameters("SetDNSServerSearchOrder");
                 newDNS["DNSServerSearchOrder"] = dns.Split(',');
-                var setDns =
-                    objMO.InvokeMethod("SetDNSServerSearchOrder", newDNS, null);
+                var setDns = objMo.InvokeMethod("SetDNSServerSearchOrder", newDNS, null);
                 return 1;
             }
 
