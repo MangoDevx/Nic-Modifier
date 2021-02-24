@@ -340,21 +340,29 @@ namespace SetupNetAdapter
 
         private int SetDNS(string dns, NetworkInterface nic)
         {
-            var objMC = new ManagementClass("Win32_NetworkAdapterConfiguration");
-            var objMOC = objMC.GetInstances();
-
-            foreach (ManagementObject objMo in objMOC)
+            try
             {
-                if (!(bool)objMo["IPEnabled"]) continue;
-                //Console.WriteLine(objMo["Caption"].ToString().ToLowerInvariant());
-                //Console.WriteLine(nic.Description.ToLowerInvariant());
-                if (!objMo["Caption"].ToString().ToLowerInvariant().Contains(nic.Description.ToLowerInvariant())) continue;
-                var newDns = objMo.GetMethodParameters("SetDNSServerSearchOrder");
-                newDns["DNSServerSearchOrder"] = dns.Split(',');
-                var setDns = objMo.InvokeMethod("SetDNSServerSearchOrder", newDns, null);
-                return 1;
+                var searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_NetworkAdapterConfiguration");
+                foreach (ManagementObject objMo in searcher.Get())
+                {
+                    var ipEnabled = bool.Parse(objMo["IPEnabled"].ToString() ?? throw new InvalidOperationException());
+                    if (!ipEnabled) continue;
+                    Console.WriteLine($"objMo Caption: {objMo["Caption"].ToString().ToLowerInvariant()}");
+                    Console.WriteLine($"Nic description: {nic.Description.ToLowerInvariant()}");
+                    if (!objMo["Caption"].ToString().ToLowerInvariant().Contains(nic.Description.ToLowerInvariant())) continue;
+                    var dnsServerSearchOrder = (String[])objMo["DNSServerSearchOrder"];
+                    Console.WriteLine($"dnsServerSearchOrder found. {dnsServerSearchOrder[0] ?? "N/A"}, {dnsServerSearchOrder[1] ?? "N/A"}");
+                    dnsServerSearchOrder = dns.Split(',');
+                    var newDns = objMo.GetMethodParameters("SetDNSServerSearchOrder");
+                    newDns["DNSServerSearchOrder"] = dnsServerSearchOrder;
+                    objMo.InvokeMethod("SetDNSServerSearchOrder", newDns, null);
+                    return 1;
+                }
             }
-
+            catch (ManagementException e)
+            {
+                Console.WriteLine($"ME {e.StackTrace}");
+            }
             return 0;
         }
     }
