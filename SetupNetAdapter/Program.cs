@@ -70,6 +70,12 @@ namespace SetupNetAdapter
             foreach (var ip in selectedNicIpProperties.UnicastAddresses)
             {
                 if (ip.Address.AddressFamily != AddressFamily.InterNetwork) continue;
+                if (ip.Address.ToString().ToLowerInvariant().Contains(":"))
+                {
+                    Console.WriteLine("Please disable your IPv6 first. Press any key to continue, or escape to quit.");
+                    if (Console.ReadKey().Key == ConsoleKey.Escape)
+                        Environment.Exit(-1);
+                }
                 Console.WriteLine($"Nic IpV4: {ip.Address}");
                 nicIpv4 = ip.Address;
             }
@@ -83,6 +89,13 @@ namespace SetupNetAdapter
             }
 
             var nicDefaultGateway = selectedNicIpProperties.GatewayAddresses[0].Address;
+            if (nicDefaultGateway.ToString().ToLowerInvariant().Contains(":"))
+            {
+                Console.WriteLine("Please disable your IPv6 first. Press any key to continue, or escape to quit.");
+                if (Console.ReadKey().Key == ConsoleKey.Escape)
+                    Environment.Exit(-1);
+            }
+
             Console.WriteLine($"Nic Default Gateway: {nicDefaultGateway}\n");
             GetNewValues(selectedNic, nicIpv4, nicDefaultGateway);
         }
@@ -306,7 +319,7 @@ namespace SetupNetAdapter
                 //Console.WriteLine(objMo["Caption"].ToString().ToLowerInvariant());
                 //Console.WriteLine(nic.Description.ToLowerInvariant());
                 if (!objMo["Caption"].ToString().ToLowerInvariant().Contains(nic.Description.ToLowerInvariant())) continue;
-                
+
                 var newDNS = objMo.GetMethodParameters("SetDNSServerSearchOrder");
                 newDNS["DNSServerSearchOrder"] = dns.Split(',');
                 var setDns = objMo.InvokeMethod("SetDNSServerSearchOrder", newDNS, null);
