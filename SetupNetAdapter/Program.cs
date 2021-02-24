@@ -122,9 +122,8 @@ namespace SetupNetAdapter
 
                 if (input.Contains("r"))
                 {
-                    var startInfo = new ProcessStartInfo($"netsh interface ip set address \"{nic.Name}\" dhcp");
-                    var process = new Process { StartInfo = startInfo };
-                    process.Start();
+                    var startInfo = new ProcessStartInfo("netsh", $"interface ip set address \"{nic.Name}\" dhcp");
+                    var process = new Process {StartInfo = startInfo}.Start();
                     Console.WriteLine("Changes reverted. Exiting in 3 seconds.");
                     Thread.Sleep(3000);
                     Environment.Exit(-1);
