@@ -9,6 +9,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Principal;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace SetupNetAdapter
 {
@@ -104,7 +105,7 @@ namespace SetupNetAdapter
         {
             Console.WriteLine("Ipv4 editing, you have 3 options.\n" +
                               "1) Leave blank and hit enter for default\n" +
-                              "2) Type \"m\" to add .10 to the end off the ipv4. Every m you type will add another .10 (mm = .20, mmm = .30, etc)\n" +
+                              "2) Type \"n\" to use the next available address\n" +
                               "3) Type a new local ipv4 manually");
             IPAddress localIp;
             while (true)
@@ -120,36 +121,18 @@ namespace SetupNetAdapter
                     break;
                 }
 
-                if (input.Contains("m"))
+                if (input.Contains("n"))
                 {
-                    var stringIPv4 = defaultIpv4.ToString();
-                    var ipv4Split = stringIPv4.Split('.');
-                    var lastValue = ipv4Split.Last();
-                    if (!int.TryParse(lastValue, out var editableLastValue))
+                    var nextAvailableAddress = GetNextAvailableAddress(defaultIpv4);
+                    if (nextAvailableAddress.ToString().Equals("0.0.0.0"))
                     {
                         Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine("Failed to parse last ip value to integer.");
+                        Console.WriteLine("Unable to find next available address!");
                         Console.ResetColor();
+                        Thread.Sleep(1);
                         continue;
                     }
-
-                    var valueToAdd = 10 * input.Length;
-                    if (editableLastValue + valueToAdd > 255)
-                        editableLastValue = 255;
-                    else
-                        editableLastValue += valueToAdd;
-                    var newIpString = string.Empty;
-                    for (var i = 0; i < ipv4Split.Length; i++)
-                    {
-                        if (i == ipv4Split.Length - 1)
-                        {
-                            newIpString += $"{editableLastValue}";
-                            break;
-                        }
-                        newIpString += $"{ipv4Split[i]}.";
-                    }
-
-                    localIp = IPAddress.Parse(newIpString);
+                    localIp = nextAvailableAddress;
                     break;
                 }
 
@@ -158,6 +141,7 @@ namespace SetupNetAdapter
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("Invalid input!");
                     Console.ResetColor();
+                    Thread.Sleep(1);
                     continue;
                 }
                 localIp = localIpInput;
@@ -183,6 +167,7 @@ namespace SetupNetAdapter
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("Invalid input!");
                     Console.ResetColor();
+                    Thread.Sleep(1);
                     continue;
                 }
                 defaultGateway = defaultGatewayInput;
@@ -208,6 +193,7 @@ namespace SetupNetAdapter
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("Invalid input!");
                     Console.ResetColor();
+                    Thread.Sleep(1);
                     continue;
                 }
                 dnsOne = dnsOneInput;
@@ -233,6 +219,7 @@ namespace SetupNetAdapter
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("Invalid input!");
                     Console.ResetColor();
+                    Thread.Sleep(1);
                     continue;
                 }
                 dnsTwo = dnsTwoInput;
@@ -251,6 +238,49 @@ namespace SetupNetAdapter
             }
 
             RunEditProcesses(nic, localIp, defaultGateway, dnsOne, dnsTwo);
+        }
+
+        private IPAddress GetNextAvailableAddress(IPAddress ipv4)
+        {
+            var ping = new Ping();
+            var stringIPv4 = ipv4.ToString();
+            var ipv4Split = stringIPv4.Split('.');
+            var lastValue = ipv4Split.Last();
+            if (!int.TryParse(lastValue, out var editableLastValue))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Failed to parse last ip value to integer.");
+                Console.ResetColor();
+                return default;
+            }
+
+            var pingIps = new List<IPAddress>();
+            var newIpString = string.Empty;
+            for (var j = 5; j < 255; j++)
+            {
+                for (var i = 0; i < ipv4Split.Length; i++)
+                {
+                    if (i == ipv4Split.Length - 1)
+                    {
+                        newIpString += $"{j}";
+                        break;
+                    }
+                    newIpString += $"{ipv4Split[i]}.";
+                }
+
+                var parsedIp = IPAddress.Parse(newIpString);
+                pingIps.Add(parsedIp);
+                newIpString = string.Empty;
+            }
+
+            foreach (var ip in pingIps)
+            {
+                var response = ping.Send(ip, 2000);
+                if (response.Status != IPStatus.Success)
+                    return ip;
+            }
+
+            return default;
         }
 
         private void RunEditProcesses(NetworkInterface nic, IPAddress localIp, IPAddress defaultGateway, IPAddress dnsOne, IPAddress dnsTwo)
@@ -319,10 +349,9 @@ namespace SetupNetAdapter
                 //Console.WriteLine(objMo["Caption"].ToString().ToLowerInvariant());
                 //Console.WriteLine(nic.Description.ToLowerInvariant());
                 if (!objMo["Caption"].ToString().ToLowerInvariant().Contains(nic.Description.ToLowerInvariant())) continue;
-
-                var newDNS = objMo.GetMethodParameters("SetDNSServerSearchOrder");
-                newDNS["DNSServerSearchOrder"] = dns.Split(',');
-                var setDns = objMo.InvokeMethod("SetDNSServerSearchOrder", newDNS, null);
+                var newDns = objMo.GetMethodParameters("SetDNSServerSearchOrder");
+                newDns["DNSServerSearchOrder"] = dns.Split(',');
+                var setDns = objMo.InvokeMethod("SetDNSServerSearchOrder", newDns, null);
                 return 1;
             }
 
