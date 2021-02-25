@@ -123,7 +123,7 @@ namespace SetupNetAdapter
                 if (input.Contains("r"))
                 {
                     var startInfo = new ProcessStartInfo("netsh", $"interface ip set address \"{nic.Name}\" dhcp");
-                    var process = new Process {StartInfo = startInfo}.Start();
+                    var process = new Process { StartInfo = startInfo }.Start();
                     Console.WriteLine("Changes reverted. Exiting in 3 seconds.");
                     Thread.Sleep(3000);
                     Environment.Exit(-1);
@@ -296,18 +296,11 @@ namespace SetupNetAdapter
             try
             {
                 Console.WriteLine("Starting nic edits, if you lose connectivity please wait until it finishes.");
-                var startInfo = new ProcessStartInfo("netsh", $"interface ip set address {nic.Name} static {localIp} 255.255.255.0 {defaultGateway}");
+                var startInfo = new ProcessStartInfo("netsh", $"interface ip set address \"{nic.Name}\" static {localIp} 255.255.255.0 {defaultGateway}");
                 var process = new Process { StartInfo = startInfo };
                 process.Start();
+                Thread.Sleep(1000); // Just a peace in mind performance check for the PS to fully execute
                 Console.WriteLine("netsh updated IPv4, and gateway");
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"ipv4 {e.Message}\n{e.StackTrace}");
-            }
-
-            try
-            {
                 Console.WriteLine("Starting DNS update");
                 var result = SetDNS($"{dnsOne},{dnsTwo}", nic);
 
@@ -322,18 +315,17 @@ namespace SetupNetAdapter
                     Thread.Sleep(3000);
                     Environment.Exit(-1);
                 }
-
-                Console.WriteLine("Updating nic finished. Press any key to exit.");
-                Console.ReadKey();
-                Console.WriteLine("Exiting in 3 seconds.");
-                Thread.Sleep(3000);
-                Environment.Exit(-1);
             }
             catch (Exception e)
             {
-                Console.WriteLine($"dns {e.Message}\n{e.StackTrace}");
-                Console.ReadKey();
+                Console.WriteLine($"Log: {e.StackTrace}\n\n{e.Message}");
             }
+
+            Console.WriteLine("Updating nic finished. Press any key to exit.");
+            Console.ReadKey();
+            Console.WriteLine("Exiting in 3 seconds.");
+            Thread.Sleep(3000);
+            Environment.Exit(-1);
         }
 
         private int SetDNS(string dns, NetworkInterface nic)
