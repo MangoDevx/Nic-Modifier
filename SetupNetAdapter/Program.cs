@@ -250,7 +250,7 @@ namespace SetupNetAdapter
 
         private IPAddress GetNextAvailableAddress(IPAddress ipv4)
         {
-            var ping = new Ping();
+            using var ping = new Ping();
             var stringIPv4 = ipv4.ToString();
             var ipv4Split = stringIPv4.Split('.');
             var lastValue = ipv4Split.Last();
@@ -264,7 +264,11 @@ namespace SetupNetAdapter
 
             var pingIps = new List<IPAddress>();
             var newIpString = string.Empty;
-            for (var j = 5; j < 255; j++)
+
+            if (editableLastValue >= 250)
+                editableLastValue = 25;
+
+            for (var j = editableLastValue; j <= 255; j++)
             {
                 for (var i = 0; i < ipv4Split.Length; i++)
                 {
